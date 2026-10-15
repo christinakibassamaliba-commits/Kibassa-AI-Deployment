@@ -578,7 +578,8 @@ def generate_gemini_response(prompt):
 
     except Exception as error:
         error_text = str(error)
-
+        print(f"Gemini API error: {type(error).__name__}; status: {getattr(error, 'code', 'unknown')}", flush=True)
+        
         if "503" in error_text or "UNAVAILABLE" in error_text:
             return (
                 "Gemini AI is temporarily experiencing high demand. "
