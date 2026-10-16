@@ -45,7 +45,21 @@ try:
     )
 except Exception:
     supabase = None
-    
+# -------- Supabase Authentication --------
+if "supabase_user" not in st.session_state:
+    st.session_state["supabase_user"] = None
+if "supabase_session" not in st.session_state:
+    st.session_state["supabase_session"] = None
+# -------- Authentication Form --------
+def show_auth_form():
+    st.subheader("Welcome to Kibassa AI")
+    auth_choice = st.radio(
+        "Choose an option", ["Log In", "Sign Up"]
+    )
+    email = st.text_input("Email Address")
+    password = st.text_input("Password", type="password")
+    if st.button(auth_choice):
+        st.info("Authentication setup in progress.")
 # ---------- Session State ----------
 
 
