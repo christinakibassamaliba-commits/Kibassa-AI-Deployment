@@ -39,10 +39,14 @@ except Exception as error:
 # -------- Supabase Database Setup --------
 
 try:
-    supabase = create_client(
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_KEY"]
-    )
+    if "supabase_client" not in st.session_state:
+        st.session_state["supabase_client"] = create_client(
+            st.secrets["SUPABASE_URL"],
+            st.secrets["SUPABASE_KEY"]
+        )
+
+    supabase = st.session_state["supabase_client"]
+
 except Exception:
     supabase = None
 # -------- Supabase Authentication --------
