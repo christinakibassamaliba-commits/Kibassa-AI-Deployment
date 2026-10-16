@@ -59,7 +59,45 @@ def show_auth_form():
     email = st.text_input("Email Address")
     password = st.text_input("Password", type="password")
     if st.button(auth_choice):
-        st.info("Authentication setup in progress.")
+        if supabase is None:
+            st.error("Database connection is unavailable.")
+
+        elif not email or not password:
+            st.warning("Please enter your email and password.")
+
+        else:
+            try:
+                if auth_choice == "Sign Up":
+                    response = supabase.auth.sign_up({
+                        "email": email,
+                        "password": password
+                    })
+
+                    if response.session:
+                        st.session_state["supabase_user"] = response.user
+                        st.session_state["supabase_session"] = response.session
+                        st.success("Account created successfully!")
+                        st.rerun()
+                    else:
+                        st.success(
+                            "Account created! Check your email "
+                            "for a confirmation link, then log in."
+                        )
+
+                else:
+                    response = supabase.auth.sign_in_with_password({
+                        "email": email,
+                        "password": password
+                    })
+
+                    st.session_state["supabase_user"] = response.user
+                    st.session_state["supabase_session"] = response.session
+
+                    st.success("Logged in successfully!")
+                    st.rerun()
+
+            except Exception as error:
+                st.error(f"Authentication failed: {error}")
 # ---------- Session State ----------
 
 
