@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from datetime import datetime
 
 import streamlit as st
+from supabase import create_client
 import base64
 from google import genai
 from io import BytesIO
@@ -34,6 +35,17 @@ except Exception as error:
     gemini_available = False
     gemini_setup_error = str(error)
 
+
+# -------- Supabase Database Setup --------
+
+try:
+    supabase = create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
+    )
+except Exception:
+    supabase = None
+    
 # ---------- Session State ----------
 
 
