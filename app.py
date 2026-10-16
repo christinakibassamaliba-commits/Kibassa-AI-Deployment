@@ -1073,7 +1073,50 @@ def show_risk_result(score: int, findings: list[str]) -> None:
 if st.session_state["supabase_user"] is None:
     show_auth_form()
     st.stop()
-    
+# -------- Load Saved Scan History --------
+user = st.session_state.get("supabase_user")
+session = st.session_state.get("supabase_session")
+
+if (
+    supabase is not None
+    and user is not None
+    and session is not None
+    and st.session_state.get("history_loaded_for") != user.id
+):
+    try:
+        refreshed = supabase.auth.set_session(
+            session.access_token,
+            session.refresh_token
+        )
+
+        st.session_state["supabase_session"] = refreshed.session
+        st.session_state["supabase_user"] = refreshed.user
+
+        response = (
+            supabase.table("scan_history")
+            .select("scan_type, score, risk_level, target, created_at")
+            .eq("user_id", refreshed.user.id)
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+
+        saved_scans = []
+
+        for scan in response.data:
+            saved_scans.append({
+                "scan_type": scan["scan_type"],
+                "score": scan["score"],
+                "risk_level": scan["risk_level"],
+                "target": scan["target"],
+                "time": scan["created_at"]
+            })
+
+        st.session_state["scan_history"] = saved_scans
+        st.session_state["history_loaded_for"] = refreshed.user.id
+
+    except Exception:
+        st.warning("Could not load saved scan history.")   
 # -------- Logout --------
 if st.button("Log Out"):
     if supabase is not None:
@@ -1085,6 +1128,7 @@ if st.button("Log Out"):
     st.session_state["supabase_user"] = None
     st.session_state["supabase_session"] = None
     st.session_state["scan_history"] = []
+    st.session_state["history_loaded_for"] = None
     st.rerun()    
 # ---------- Header ----------
 from PIL import Image
