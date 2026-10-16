@@ -161,7 +161,30 @@ def record_analysis(scan_type, score, target):
         st.session_state["scan_history"][:20]
     )
 
-    
+    # -------- Save Scan to Supabase --------
+    user = st.session_state.get("supabase_user")
+    session = st.session_state.get("supabase_session")
+
+    if supabase is not None and user is not None and session is not None:
+        try:
+            supabase.auth.set_session(
+                session.access_token,
+                session.refresh_token
+            )
+
+            supabase.table("scan_history").insert({
+                "user_id": user.id,
+                "scan_type": scan_type,
+                "score": int(score),
+                "risk_level": risk_level,
+                "target": target
+            }).execute()
+
+        except Exception:
+            st.warning(
+                "Scan saved for this session, "
+                "but permanent database saving failed."
+            )
 
 
 def extract_email_details(email_text):
