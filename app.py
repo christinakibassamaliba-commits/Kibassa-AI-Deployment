@@ -1042,7 +1042,23 @@ def show_risk_result(score: int, findings: list[str]) -> None:
         else:
             st.success("No credential request detected")
 
+# -------- Login Gate --------
+if st.session_state["supabase_user"] is None:
+    show_auth_form()
+    st.stop()
+    
+# -------- Logout --------
+if st.button("Log Out"):
+    if supabase is not None:
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
 
+    st.session_state["supabase_user"] = None
+    st.session_state["supabase_session"] = None
+    st.session_state["scan_history"] = []
+    st.rerun()    
 # ---------- Header ----------
 from PIL import Image
 
