@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from datetime import datetime
 
 import streamlit as st
+from supabase import create_client
 import base64
 from google import genai
 from io import BytesIO
@@ -34,6 +35,73 @@ except Exception as error:
     gemini_available = False
     gemini_setup_error = str(error)
 
+
+# -------- Supabase Database Setup --------
+
+try:
+    if "supabase_client" not in st.session_state:
+        st.session_state["supabase_client"] = create_client(
+            st.secrets["SUPABASE_URL"],
+            st.secrets["SUPABASE_KEY"]
+        )
+
+    supabase = st.session_state["supabase_client"]
+
+except Exception:
+    supabase = None
+# -------- Supabase Authentication --------
+if "supabase_user" not in st.session_state:
+    st.session_state["supabase_user"] = None
+if "supabase_session" not in st.session_state:
+    st.session_state["supabase_session"] = None
+# -------- Authentication Form --------
+def show_auth_form():
+    st.subheader("Welcome to Kibassa AI")
+    auth_choice = st.radio(
+        "Choose an option", ["Log In", "Sign Up"]
+    )
+    email = st.text_input("Email Address")
+    password = st.text_input("Password", type="password")
+    if st.button(auth_choice):
+        if supabase is None:
+            st.error("Database connection is unavailable.")
+
+        elif not email or not password:
+            st.warning("Please enter your email and password.")
+
+        else:
+            try:
+                if auth_choice == "Sign Up":
+                    response = supabase.auth.sign_up({
+                        "email": email,
+                        "password": password
+                    })
+
+                    if response.session:
+                        st.session_state["supabase_user"] = response.user
+                        st.session_state["supabase_session"] = response.session
+                        st.success("Account created successfully!")
+                        st.rerun()
+                    else:
+                        st.success(
+                            "Account created! Check your email "
+                            "for a confirmation link, then log in."
+                        )
+
+                else:
+                    response = supabase.auth.sign_in_with_password({
+                        "email": email,
+                        "password": password
+                    })
+
+                    st.session_state["supabase_user"] = response.user
+                    st.session_state["supabase_session"] = response.session
+
+                    st.success("Logged in successfully!")
+                    st.rerun()
+
+            except Exception as error:
+                st.error(f"Authentication failed: {error}")
 # ---------- Session State ----------
 
 
@@ -93,7 +161,30 @@ def record_analysis(scan_type, score, target):
         st.session_state["scan_history"][:20]
     )
 
-    
+    # -------- Save Scan to Supabase --------
+    user = st.session_state.get("supabase_user")
+    session = st.session_state.get("supabase_session")
+
+    if supabase is not None and user is not None and session is not None:
+        try:
+            supabase.auth.set_session(
+                session.access_token,
+                session.refresh_token
+            )
+
+            supabase.table("scan_history").insert({
+                "user_id": user.id,
+                "scan_type": scan_type,
+                "score": int(score),
+                "risk_level": risk_level,
+                "target": target
+            }).execute()
+
+        except Exception:
+            st.warning(
+                "Scan saved for this session, "
+                "but permanent database saving failed."
+            )
 
 
 def extract_email_details(email_text):
@@ -978,7 +1069,67 @@ def show_risk_result(score: int, findings: list[str]) -> None:
         else:
             st.success("No credential request detected")
 
+# -------- Login Gate --------
+if st.session_state["supabase_user"] is None:
+    show_auth_form()
+    st.stop()
+# -------- Load Saved Scan History --------
+user = st.session_state.get("supabase_user")
+session = st.session_state.get("supabase_session")
 
+if (
+    supabase is not None
+    and user is not None
+    and session is not None
+    and st.session_state.get("history_loaded_for") != user.id
+):
+    try:
+        refreshed = supabase.auth.set_session(
+            session.access_token,
+            session.refresh_token
+        )
+
+        st.session_state["supabase_session"] = refreshed.session
+        st.session_state["supabase_user"] = refreshed.user
+
+        response = (
+            supabase.table("scan_history")
+            .select("scan_type, score, risk_level, target, created_at")
+            .eq("user_id", refreshed.user.id)
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+
+        saved_scans = []
+
+        for scan in response.data:
+            saved_scans.append({
+                "scan_type": scan["scan_type"],
+                "score": scan["score"],
+                "risk_level": scan["risk_level"],
+                "target": scan["target"],
+                "time": scan["created_at"]
+            })
+
+        st.session_state["scan_history"] = saved_scans
+        st.session_state["history_loaded_for"] = refreshed.user.id
+
+    except Exception as e:
+        st.warning(f"Could not load saved scan history: {e}")  
+# -------- Logout --------
+if st.button("Log Out"):
+    if supabase is not None:
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
+
+    st.session_state["supabase_user"] = None
+    st.session_state["supabase_session"] = None
+    st.session_state["scan_history"] = []
+    st.session_state["history_loaded_for"] = None
+    st.rerun()    
 # ---------- Header ----------
 from PIL import Image
 
