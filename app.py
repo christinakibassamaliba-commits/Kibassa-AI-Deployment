@@ -175,7 +175,7 @@ def record_analysis(scan_type, score, target):
             supabase.table("scan_history").insert({
                 "user_id": user.id,
                 "scan_type": scan_type,
-                "risk_score": int(score),
+                "score": int(score),
                 "risk_level": risk_level,
                 "target": target
             }).execute()
