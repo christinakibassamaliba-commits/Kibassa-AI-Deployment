@@ -1115,8 +1115,8 @@ if (
         st.session_state["scan_history"] = saved_scans
         st.session_state["history_loaded_for"] = refreshed.user.id
 
-    except Exception:
-        st.warning("Could not load saved scan history.")   
+except Exception as e:
+    st.warning(f"Could not load saved scan history: {type(e).__name__}")  
 # -------- Logout --------
 if st.button("Log Out"):
     if supabase is not None:
