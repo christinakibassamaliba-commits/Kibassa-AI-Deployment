@@ -55,8 +55,13 @@ if "supabase_user" not in st.session_state:
 if "supabase_session" not in st.session_state:
     st.session_state["supabase_session"] = None
 # -------- Authentication Form --------
+if "guest_mode" not in st.session_state:
+    st.session_state["guest_mode"] = False
 def show_auth_form():
     st.subheader("Welcome to Kibassa AI")
+    if st.button("Continue as Guest"):
+        st.session_state["guest_mode"] = True
+        st.rerun()
     auth_choice = st.radio(
         "Choose an option", ["Log In", "Sign Up"]
     )
@@ -165,7 +170,7 @@ def record_analysis(scan_type, score, target):
     user = st.session_state.get("supabase_user")
     session = st.session_state.get("supabase_session")
 
-    if supabase is not None and user is not None and session is not None:
+    if supabase is not None and user is not None and session is not None and not st.session_state.get("guest_mode", False):
         try:
             supabase.auth.set_session(
                 session.access_token,
@@ -1070,9 +1075,16 @@ def show_risk_result(score: int, findings: list[str]) -> None:
             st.success("No credential request detected")
 
 # -------- Login Gate --------
-if st.session_state["supabase_user"] is None:
+if st.session_state["supabase_user"] is None and not st.session_state["guest_mode"]:
     show_auth_form()
     st.stop()
+if st.session_state["guest_mode"]:
+    st.info(
+        "🔒 Guest Mode: Your scans are temporary and are not "
+        "saved to your account or our database. Your dashboard "
+        "history may disappear when your session ends. "
+        "Create an account or log in to save your scan history."
+    )
 # -------- Load Saved Scan History --------
 user = st.session_state.get("supabase_user")
 session = st.session_state.get("supabase_session")
@@ -1117,8 +1129,14 @@ if (
 
     except Exception as e:
         st.warning(f"Could not load saved scan history: {e}")  
+if st.session_state.get("guest_mode", False):
+    if st.button("Exit Guest Mode"):
+        st.session_state["guest_mode"] = False
+        st.session_state["scan_history"] = []
+        st.session_state["history_loaded_for"] = None
+        st.rerun()
 # -------- Logout --------
-if st.button("Log Out"):
+if not st.session_state.get("guest_mode", False) and st.button("Log Out"):
     if supabase is not None:
         try:
             supabase.auth.sign_out()
